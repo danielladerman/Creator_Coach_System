@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Process Creator Content{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <h1><i class="fas fa-cogs me-2"></i>Process Creator Content</h1>
+        <p class="lead">Analyze content and create AI coach</p>
+
+        <div class="card">
+            <div class="card-body">
+                <h5>Processing Steps</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-microphone fa-2x text-primary mb-2"></i>
+                            <h6>1. Transcribe Videos</h6>
+                            <p class="small text-muted">Convert video content to text</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-brain fa-2x text-success mb-2"></i>
+                            <h6>2. Analyze Content</h6>
+                            <p class="small text-muted">Extract expertise and frameworks</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-robot fa-2x text-info mb-2"></i>
+                            <h6>3. Create Coach</h6>
+                            <p class="small text-muted">Generate AI coach with knowledge base</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="processSection">
+                    <div class="d-grid">
+                        <button id="startProcessBtn" class="btn btn-success btn-lg">
+                            <i class="fas fa-play me-2"></i>Start Processing Creator {{ creator_id }}
+                        </button>
+                    </div>
+                </div>
+
+                <div id="progressSection" class="mt-4" style="display: none;">
+                    <h5>Processing Progress</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" style="width: 0%" id="progressBar"></div>
+                    </div>
+                    <div id="statusText" class="text-muted">Starting processing...</div>
+                </div>
+
+                <div id="resultsSection" class="mt-4" style="display: none;">
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle me-2"></i>Processing Complete!</h5>
+                        <div id="resultsText"></div>
+                        <hr>
+                        <div class="d-grid">
+                            <a href="#" id="chatBtn" class="btn btn-primary">
+                                <i class="fas fa-comments me-2"></i>Chat with Coach
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorSection" class="mt-4" style="display: none;">
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Processing Failed</h5>
+                        <div id="errorText"></div>
+                        <hr>
+                        <button class="btn btn-outline-secondary" onclick="location.reload()">
+                            <i class="fas fa-redo me-2"></i>Try Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('scrape_page') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Scraping
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const creatorId = {{ creator_id }};
+
+document.getElementById('startProcessBtn').addEventListener('click', function() {
+    // Show progress section
+    document.getElementById('processSection').style.display = 'none';
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('errorSection').style.display = 'none';
+
+    // Update progress
+    let progress = 0;
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('statusText');
+
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 5;
+        if (progress > 90) progress = 90;
+        progressBar.style.width = progress + '%';
+
+        const statuses = [
+            'Transcribing video content...',
+            'Analyzing expertise areas...',
+            'Extracting frameworks...',
+            'Building knowledge base...',
+            'Creating AI coach...',
+            'Finalizing coach profile...'
+        ];
+        statusText.textContent = statuses[Math.floor(progress / 15) % statuses.length];
+    }, 1000);
+
+    // Make API call
+    fetch(`/api/process/${creatorId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+
+        if (data.success) {
+            statusText.textContent = 'Processing completed successfully!';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            const results = data.results;
+            document.getElementById('resultsText').innerHTML = `
+                <strong>Content Analysis:</strong><br>
+                📊 Posts processed: ${results.total_posts}<br>
+                🎥 Videos transcribed: ${results.transcription_results?.successful || 0}<br>
+                🧠 Expertise areas found: ${results.analysis_results?.transcribed_posts || 0}<br>
+                ⚡ Frameworks extracted: ${results.analysis_results?.frameworks || 0}<br>
+                📚 Knowledge chunks: ${results.coach_creation_results?.knowledge_chunks || 0}
+            `;
+
+            document.getElementById('chatBtn').href = data.next_step;
+        } else {
+            throw new Error(data.error || 'Unknown error occurred');
+        }
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        document.getElementById('progressSection').style.display = 'none';
+        document.getElementById('errorSection').style.display = 'block';
+        document.getElementById('errorText').textContent = error.message;
+    });
+});
+</script>
+{% endblock %}

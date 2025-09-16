@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Chat with @{{ coach_info.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h4 class="mb-0">
+                            <i class="fab fa-instagram me-2"></i>
+                            @{{ coach_info.name }}
+                        </h4>
+                        <small>AI Coach based on real content analysis</small>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#coachInfoModal">
+                            <i class="fas fa-info-circle me-1"></i>Coach Info
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body p-0">
+                <div id="chatContainer" class="chat-container p-4">
+                    <div class="message coach-message">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <p class="mb-2">
+                                    <strong>👋 Hi! I'm @{{ coach_info.name }}</strong>
+                                </p>
+                                <p class="mb-0">
+                                    I'm here to help you with advice based on my real experience and proven methods.
+                                    My expertise areas include:
+                                    {% for area in [][:3] %}
+                                        <span class="badge bg-primary me-1">{{ area }}</span>
+                                    {% endfor %}
+                                </p>
+                                <p class="mt-2 mb-0">
+                                    Ask me anything related to my expertise, and I'll reference my actual content and strategies!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-top p-3">
+                    <form id="questionForm">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="questionInput"
+                                   placeholder="Ask me about my strategies, frameworks, or advice..."
+                                   maxlength="500" required>
+                            <button class="btn btn-primary" type="submit" id="sendBtn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Ask specific questions about strategies, frameworks, or advice related to my expertise
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('coaches_list') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Coaches
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Coach Info Modal -->
+<div class="modal fade" id="coachInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-circle me-2"></i>
+                    Coach Profile: @{{ coach_info.name }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6><i class="fas fa-lightbulb me-2"></i>Expertise Areas</h6>
+                <div class="mb-3">
+                    {% for area in [] %}
+                        <span class="badge bg-primary me-1 mb-1">{{ area }}</span>
+                    {% endfor %}
+                </div>
+
+                {% if coach_info.frameworks %}
+                <h6><i class="fas fa-cogs me-2"></i>Proven Frameworks</h6>
+                <ul class="list-group list-group-flush mb-3">
+                    {% for framework in coach_info.frameworks %}
+                        <li class="list-group-item">{{ framework }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if coach_info.signature_phrases %}
+                <h6><i class="fas fa-quote-left me-2"></i>Signature Phrases</h6>
+                <div class="mb-3">
+                    {% for phrase in coach_info.signature_phrases[:5] %}
+                        <span class="badge bg-secondary me-1 mb-1">"{{ phrase }}"</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if coach_info.analysis_summary %}
+                <h6><i class="fas fa-chart-line me-2"></i>Analysis Summary</h6>
+                <p class="text-muted">{{ coach_info.analysis_summary }}</p>
+                {% endif %}
+
+                {% if coach_info.content_analysis_date %}
+                <small class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    Content analyzed: {{ coach_info.content_analysis_date[:10] }}
+                </small>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const creatorId = {{ creator_id }};
+const chatContainer = document.getElementById('chatContainer');
+const questionForm = document.getElementById('questionForm');
+const questionInput = document.getElementById('questionInput');
+const sendBtn = document.getElementById('sendBtn');
+
+// Auto-focus on input
+questionInput.focus();
+
+// Handle form submission
+questionForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const question = questionInput.value.trim();
+    if (!question) return;
+
+    // Add user message to chat
+    addMessage(question, 'user');
+
+    // Clear input and disable form
+    questionInput.value = '';
+    setFormLoading(true);
+
+    // Send to API
+    fetch(`/api/ask/${creatorId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question: question })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Add coach response
+        addCoachMessage(data);
+    })
+    .catch(error => {
+        addMessage(`Sorry, I couldn't process your question: ${error.message}`, 'error');
+    })
+    .finally(() => {
+        setFormLoading(false);
+        questionInput.focus();
+    });
+});
+
+function addMessage(text, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}-message`;
+
+    let messageClass = 'bg-primary text-white';
+    if (type === 'user') {
+        messageClass = 'bg-primary text-white';
+    } else if (type === 'error') {
+        messageClass = 'bg-danger text-white';
+    } else {
+        messageClass = 'bg-light';
+    }
+
+    messageDiv.innerHTML = `
+        <div class="card ${messageClass} mb-2" style="max-width: 80%; ${type === 'user' ? 'margin-left: auto;' : ''}">
+            <div class="card-body py-2">
+                <p class="mb-0">${text}</p>
+            </div>
+        </div>
+    `;
+
+    chatContainer.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function addCoachMessage(data) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message coach-message';
+
+    let referencesHtml = '';
+    if (data.references && data.references.length > 0) {
+        referencesHtml = `
+            <div class="mt-2">
+                <small class="text-muted">
+                    <strong>Referenced content:</strong>
+                    ${data.context_used} posts analyzed
+                </small>
+            </div>
+        `;
+    }
+
+    messageDiv.innerHTML = `
+        <div class="card bg-light mb-2" style="max-width: 80%;">
+            <div class="card-body">
+                <div class="d-flex align-items-start mb-2">
+                    <i class="fab fa-instagram text-primary me-2 mt-1"></i>
+                    <div>
+                        <strong>@${data.coach_name}</strong>
+                        <small class="text-muted ms-2">AI Coach</small>
+                    </div>
+                </div>
+                <div class="coach-response">
+                    ${formatResponse(data.answer)}
+                </div>
+                ${referencesHtml}
+            </div>
+        </div>
+    `;
+
+    chatContainer.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function formatResponse(text) {
+    // Basic formatting for coach responses
+    return text
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>');
+}
+
+function setFormLoading(loading) {
+    sendBtn.disabled = loading;
+    questionInput.disabled = loading;
+
+    if (loading) {
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        // Add typing indicator
+        addTypingIndicator();
+    } else {
+        sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        removeTypingIndicator();
+    }
+}
+
+function addTypingIndicator() {
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'typingIndicator';
+    typingDiv.className = 'message coach-message';
+    typingDiv.innerHTML = `
+        <div class="card bg-light mb-2" style="max-width: 80%;">
+            <div class="card-body py-2">
+                <div class="d-flex align-items-center">
+                    <i class="fab fa-instagram text-primary me-2"></i>
+                    <small class="text-muted">@{{ coach_info.name }} is thinking...</small>
+                    <div class="ms-2">
+                        <span class="badge bg-secondary">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    chatContainer.appendChild(typingDiv);
+    scrollToBottom();
+}
+
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
+}
+
+function scrollToBottom() {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// Enter key to send (Shift+Enter for new line)
+questionInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        questionForm.dispatchEvent(new Event('submit'));
+    }
+});
+</script>
+{% endblock %}

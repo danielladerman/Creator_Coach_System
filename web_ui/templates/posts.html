@@ -1,0 +1,557 @@
+{% extends "base.html" %}
+
+{% block title %}Posts Management{% endblock %}
+
+{% block head %}
+<style>
+/* Optimized styles for fast loading */
+.table td {
+    vertical-align: middle;
+}
+
+.post-icon {
+    transition: background-color 0.2s ease;
+}
+
+.post-icon:hover {
+    opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="fas fa-list me-2"></i>Posts Management</h1>
+        <p class="lead">View and manage scraped posts with transcription status</p>
+    </div>
+</div>
+
+<!-- Creator Selection -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5>Select Creator</h5>
+                <select class="form-select" id="creatorSelect" onchange="loadPosts()">
+                    <option value="">Choose a creator...</option>
+                    {% for creator in creators %}
+                    <option value="{{ creator.id }}" {% if creator.id == selected_creator_id %}selected{% endif %}>
+                        @{{ creator.username }} ({{ creator.post_count }} posts)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5>Quick Actions</h5>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="transcribeVideos()" id="transcribeBtn" disabled>
+                        <i class="fas fa-microphone me-1"></i>Transcribe All Videos
+                    </button>
+                    <button class="btn btn-outline-success" onclick="updateCoach()" id="updateCoachBtn" disabled>
+                        <i class="fas fa-sync me-1"></i>Update Coach Knowledge
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Posts Table -->
+<div class="row" id="postsSection" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Posts Database</h5>
+                <div>
+                    <span class="badge bg-info me-2" id="totalPosts">0 posts</span>
+                    <span class="badge bg-success me-2" id="transcribedCount">0 transcribed</span>
+                    <span class="badge bg-warning" id="pendingCount">0 pending</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Filters -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <select class="form-select form-select-sm" id="typeFilter" onchange="filterPosts()">
+                            <option value="">All Types</option>
+                            <option value="video">Videos Only</option>
+                            <option value="image">Images Only</option>
+                            <option value="carousel">Carousels Only</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select form-select-sm" id="transcriptionFilter" onchange="filterPosts()">
+                            <option value="">All Posts</option>
+                            <option value="transcribed">Transcribed</option>
+                            <option value="pending">Pending Transcription</option>
+                            <option value="no-video">No Video Content</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" id="searchInput"
+                               placeholder="Search captions..." onkeyup="filterPosts()">
+                    </div>
+                </div>
+
+                <!-- Posts Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover" id="postsTable">
+                        <thead>
+                            <tr>
+                                <th>Post</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Engagement</th>
+                                <th>Transcription</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="postsTableBody">
+                            <!-- Posts will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Post Detail Modal -->
+<div class="modal fade" id="postModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Post Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="postModalBody">
+                <!-- Post details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="transcribePostBtn" onclick="transcribePost()">
+                    <i class="fas fa-microphone me-1"></i>Transcribe This Post
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentCreatorId = null;
+let allPosts = [];
+let currentPost = null;
+
+function loadPosts() {
+    const creatorId = document.getElementById('creatorSelect').value;
+    if (!creatorId) {
+        document.getElementById('postsSection').style.display = 'none';
+        return;
+    }
+
+    currentCreatorId = creatorId;
+
+    // Enable action buttons
+    document.getElementById('transcribeBtn').disabled = false;
+    document.getElementById('updateCoachBtn').disabled = false;
+
+    // Load posts for this creator
+    fetch(`/api/posts/${creatorId}`)
+        .then(response => response.json())
+        .then(data => {
+            allPosts = data.posts;
+            displayPosts(allPosts);
+            updateStats(allPosts);
+            document.getElementById('postsSection').style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error loading posts:', error);
+            alert('Error loading posts');
+        });
+}
+
+function displayPosts(posts) {
+    const tbody = document.getElementById('postsTableBody');
+    tbody.innerHTML = '';
+
+    posts.forEach(post => {
+        const row = document.createElement('tr');
+
+        // Post preview
+        const postPreview = post.caption_text ?
+            post.caption_text.substring(0, 50) + '...' :
+            '[No caption]';
+
+        // Engagement
+        const engagement = `${post.likes || 0} 👍 ${post.comments || 0} 💬`;
+
+        // Transcription status
+        let transcriptionStatus = '';
+        if (post.post_type === 'video') {
+            if (post.transcript) {
+                transcriptionStatus = '<span class="badge bg-success">✅ Transcribed</span>';
+            } else {
+                transcriptionStatus = '<span class="badge bg-warning">⏳ Pending</span>';
+            }
+        } else {
+            transcriptionStatus = '<span class="badge bg-secondary">📷 Image</span>';
+        }
+
+        // Format date
+        const postDate = post.post_date ? new Date(post.post_date).toLocaleDateString() : 'Unknown';
+
+        row.innerHTML = `
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="me-2 post-icon" style="width: 40px; height: 40px; background: ${post.post_type === 'video' ? '#007bff' : '#6c757d'}; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-${post.post_type === 'video' ? 'video' : 'image'} text-white" style="font-size: 14px;"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold">${post.post_id.substring(0, 10)}...</div>
+                        <small class="text-muted">${postPreview}</small>
+                    </div>
+                </div>
+            </td>
+            <td><span class="badge bg-info">${post.post_type}</span></td>
+            <td>${postDate}</td>
+            <td><small>${engagement}</small></td>
+            <td>${transcriptionStatus}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="viewPost(${allPosts.indexOf(post)})" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
+                ${post.post_type === 'video' ?
+                    `<button class="btn btn-sm btn-outline-primary ms-1" onclick="viewPostOnInstagram('${post.post_id}')" title="View Post on Instagram">
+                        <i class="fab fa-instagram me-1"></i>Instagram
+                    </button>` : ''
+                }
+                ${post.post_type === 'video' && !post.transcript ?
+                    `<button class="btn btn-sm btn-outline-success ms-1" onclick="transcribePost(${allPosts.indexOf(post)})" title="Transcribe Video">
+                        <i class="fas fa-microphone"></i>
+                    </button>` : ''
+                }
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+function updateStats(posts) {
+    const totalPosts = posts.length;
+    const videoPosts = posts.filter(p => p.post_type === 'video');
+    const transcribed = videoPosts.filter(p => p.transcript);
+    const pending = videoPosts.filter(p => !p.transcript);
+
+    document.getElementById('totalPosts').textContent = `${totalPosts} posts`;
+    document.getElementById('transcribedCount').textContent = `${transcribed.length} transcribed`;
+    document.getElementById('pendingCount').textContent = `${pending.length} pending`;
+}
+
+function filterPosts() {
+    const typeFilter = document.getElementById('typeFilter').value;
+    const transcriptionFilter = document.getElementById('transcriptionFilter').value;
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+
+    let filteredPosts = allPosts.filter(post => {
+        // Type filter
+        if (typeFilter && post.post_type !== typeFilter) return false;
+
+        // Transcription filter
+        if (transcriptionFilter === 'transcribed' && !post.transcript) return false;
+        if (transcriptionFilter === 'pending' && (post.post_type !== 'video' || post.transcript)) return false;
+        if (transcriptionFilter === 'no-video' && post.post_type === 'video') return false;
+
+        // Search filter
+        if (searchText && !post.caption_text?.toLowerCase().includes(searchText)) return false;
+
+        return true;
+    });
+
+    displayPosts(filteredPosts);
+}
+
+function viewPost(index) {
+    currentPost = allPosts[index];
+    const post = currentPost;
+
+    const modalBody = document.getElementById('postModalBody');
+    modalBody.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Post Information</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>ID:</strong></td><td>${post.post_id}</td></tr>
+                    <tr><td><strong>Type:</strong></td><td>${post.post_type}</td></tr>
+                    <tr><td><strong>Date:</strong></td><td>${post.post_date || 'Unknown'}</td></tr>
+                    <tr><td><strong>Likes:</strong></td><td>${post.likes || 0}</td></tr>
+                    <tr><td><strong>Comments:</strong></td><td>${post.comments || 0}</td></tr>
+                    <tr><td><strong>Views:</strong></td><td>${post.views || 0}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                ${post.media_url && post.post_type !== 'video' ?
+                    `<img src="${post.media_url}" class="img-fluid rounded">` :
+                    '<div class="bg-light p-4 text-center rounded">No media preview</div>'
+                }
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>Caption</h6>
+                <div class="border p-3 rounded bg-light">
+                    ${post.caption_text || '<em>No caption</em>'}
+                </div>
+            </div>
+        </div>
+
+        ${post.transcript ? `
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>Transcript</h6>
+                <div class="border p-3 rounded bg-success bg-opacity-10">
+                    ${post.transcript}
+                </div>
+            </div>
+        </div>
+        ` : ''}
+
+        ${post.hashtags && post.hashtags.length > 0 ? `
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>Hashtags</h6>
+                ${post.hashtags.map(tag => `<span class="badge bg-primary me-1">#${tag}</span>`).join('')}
+            </div>
+        </div>
+        ` : ''}
+    `;
+
+    // Show/hide transcribe button
+    const transcribeBtn = document.getElementById('transcribePostBtn');
+    if (post.post_type === 'video' && !post.transcript) {
+        transcribeBtn.style.display = 'inline-block';
+    } else {
+        transcribeBtn.style.display = 'none';
+    }
+
+    new bootstrap.Modal(document.getElementById('postModal')).show();
+}
+
+function transcribePost(index = null) {
+    const post = index !== null ? allPosts[index] : currentPost;
+    if (!post) return;
+
+    if (post.post_type !== 'video') {
+        alert('Only video posts can be transcribed');
+        return;
+    }
+
+    if (post.transcript) {
+        alert('This post is already transcribed');
+        return;
+    }
+
+    // Show loading state
+    const btn = document.getElementById('transcribePostBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Transcribing...';
+    }
+
+    // Make API call to transcribe single post
+    fetch(`/api/transcribe/${currentCreatorId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            post_ids: [post.post_id]
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Transcribed ${data.transcribed} video(s) successfully!`);
+            // Reload posts to show updated transcription status
+            loadPosts();
+
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('postModal')).hide();
+        } else {
+            alert(`❌ Transcription failed: ${data.error}`);
+        }
+    })
+    .catch(error => {
+        console.error('Transcription error:', error);
+        alert('❌ Transcription failed: Network error');
+    })
+    .finally(() => {
+        // Reset button state
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-microphone me-1"></i>Transcribe This Post';
+        }
+    });
+}
+
+function transcribeVideos() {
+    if (!currentCreatorId) return;
+
+    const videoPosts = allPosts.filter(p => p.post_type === 'video' && !p.transcript);
+    if (videoPosts.length === 0) {
+        alert('No videos need transcription');
+        return;
+    }
+
+    if (confirm(`Transcribe ${videoPosts.length} videos? This may take several minutes.`)) {
+        // Show loading state
+        const btn = document.getElementById('transcribeBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Transcribing...';
+        }
+
+        // Make API call to transcribe all videos
+        fetch(`/api/transcribe/${currentCreatorId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}) // Empty body = transcribe all videos
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Transcribed ${data.transcribed} videos successfully!\n${data.failed > 0 ? `⚠️ ${data.failed} videos failed` : ''}`);
+                // Reload posts to show updated transcription status
+                loadPosts();
+            } else {
+                alert(`❌ Transcription failed: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Transcription error:', error);
+            alert('❌ Transcription failed: Network error');
+        })
+        .finally(() => {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-microphone me-1"></i>Transcribe All Videos';
+            }
+        });
+    }
+}
+
+function updateCoach() {
+    if (!currentCreatorId) return;
+
+    if (confirm('Update coach knowledge base with current posts? This will rebuild the knowledge base and may take a few minutes.')) {
+        // Show loading state
+        const btn = document.getElementById('updateCoachBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+        }
+
+        // Make API call to update coach knowledge base
+        fetch(`/api/update-coach/${currentCreatorId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Coach updated successfully!\n📊 Posts analyzed: ${data.posts_analyzed}\n🧠 Expertise areas: ${data.transcribed_posts}\n📚 Knowledge chunks: ${data.knowledge_chunks}`);
+            } else {
+                alert(`❌ Coach update failed: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Coach update error:', error);
+            alert('❌ Coach update failed: Network error');
+        })
+        .finally(() => {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync me-1"></i>Update Coach Knowledge';
+            }
+        });
+    }
+}
+
+
+// Instagram ID to shortcode conversion
+function instagramIdToShortcode(id) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let shortcode = '';
+    let num = BigInt(id);
+
+    while (num > 0) {
+        shortcode = alphabet[num % 64n] + shortcode;
+        num = num / 64n;
+    }
+
+    return shortcode || 'A';
+}
+
+// Direct action functions for table buttons
+function viewOnInstagram() {
+    // Get creator username from the selected dropdown
+    const creatorSelect = document.getElementById('creatorSelect');
+    const selectedOption = creatorSelect.options[creatorSelect.selectedIndex];
+
+    if (!selectedOption || !selectedOption.value) {
+        alert('Please select a creator first');
+        return;
+    }
+
+    // Extract username from the option text (format: @username (X posts))
+    const optionText = selectedOption.text;
+    const usernameMatch = optionText.match(/@([^\s(]+)/);
+
+    if (usernameMatch) {
+        const username = usernameMatch[1];
+        const instagramUrl = `https://www.instagram.com/${username}/`;
+        window.open(instagramUrl, '_blank');
+    } else {
+        alert('Could not determine Instagram username');
+    }
+}
+
+function viewPostOnInstagram(postId) {
+    try {
+        const shortcode = instagramIdToShortcode(postId);
+        const instagramUrl = `https://www.instagram.com/p/${shortcode}/`;
+        window.open(instagramUrl, '_blank');
+    } catch (error) {
+        console.error('Error converting post ID:', error);
+        // Fallback to profile if conversion fails
+        viewOnInstagram();
+    }
+}
+
+// Load posts if creator is pre-selected
+if (document.getElementById('creatorSelect').value) {
+    loadPosts();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Scrape Creator Content{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <h1><i class="fas fa-download me-2"></i>Scrape Creator Content</h1>
+        <p class="lead">Start by scraping content from an Instagram creator to build their AI coach</p>
+
+        <div class="card">
+            <div class="card-body">
+                <form id="scrapeForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Instagram Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text">@</span>
+                            <input type="text" class="form-control" id="username" name="username"
+                                   placeholder="personalbrandlaunch" required>
+                        </div>
+                        <div class="form-text">Enter the Instagram username without the @ symbol</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="maxPosts" class="form-label">Maximum Posts to Scrape</label>
+                        <select class="form-select" id="maxPosts" name="max_posts">
+                            <option value="25">25 posts (Quick test)</option>
+                            <option value="50" selected>50 posts (Recommended)</option>
+                            <option value="100">100 posts (Comprehensive)</option>
+                        </select>
+                        <div class="form-text">More posts = better coach analysis, but takes longer to process</div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="scrapeBtn">
+                            <i class="fas fa-download me-2"></i>Start Scraping
+                        </button>
+                    </div>
+                </form>
+
+                <div id="progressSection" class="mt-4" style="display: none;">
+                    <h5>Scraping Progress</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" style="width: 0%" id="progressBar"></div>
+                    </div>
+                    <div id="statusText" class="text-muted">Initializing scraper...</div>
+                </div>
+
+                <div id="resultsSection" class="mt-4" style="display: none;">
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle me-2"></i>Scraping Complete!</h5>
+                        <div id="resultsText"></div>
+                        <hr>
+                        <div class="d-grid">
+                            <a href="#" id="processBtn" class="btn btn-success">
+                                <i class="fas fa-cogs me-2"></i>Process Content & Create Coach
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorSection" class="mt-4" style="display: none;">
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Scraping Failed</h5>
+                        <div id="errorText"></div>
+                        <hr>
+                        <button class="btn btn-outline-secondary" onclick="location.reload()">
+                            <i class="fas fa-redo me-2"></i>Try Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-12">
+                <h4><i class="fas fa-info-circle me-2"></i>What happens during scraping?</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <i class="fas fa-download text-primary me-2"></i>
+                                Extract posts, captions, and media URLs
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-chart-line text-success me-2"></i>
+                                Collect engagement metrics (likes, comments, views)
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-hashtag text-info me-2"></i>
+                                Parse hashtags and mentions
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <i class="fas fa-video text-warning me-2"></i>
+                                Identify video content for transcription
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-calendar text-secondary me-2"></i>
+                                Track post dates and timing patterns
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-database text-dark me-2"></i>
+                                Store all data for analysis
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('scrapeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const maxPosts = document.getElementById('maxPosts').value;
+
+    if (!username) {
+        alert('Please enter a username');
+        return;
+    }
+
+    // Show progress section
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('errorSection').style.display = 'none';
+
+    // Disable form
+    document.getElementById('scrapeBtn').disabled = true;
+    document.getElementById('scrapeBtn').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scraping...';
+
+    // Update progress
+    let progress = 0;
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('statusText');
+
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 10;
+        if (progress > 90) progress = 90;
+        progressBar.style.width = progress + '%';
+
+        const statuses = [
+            'Connecting to Instagram...',
+            'Fetching profile data...',
+            'Downloading posts...',
+            'Processing media URLs...',
+            'Extracting metadata...',
+            'Saving to database...'
+        ];
+        statusText.textContent = statuses[Math.floor(progress / 15) % statuses.length];
+    }, 1000);
+
+    // Make API call
+    fetch('/api/scrape', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            max_posts: maxPosts
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+
+        if (data.success) {
+            statusText.textContent = 'Scraping completed successfully!';
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsText').innerHTML = `
+                <strong>@${data.username}</strong><br>
+                📊 Posts scraped: ${data.posts_scraped}<br>
+                💾 Posts saved: ${data.posts_saved}<br>
+                🆔 Creator ID: ${data.creator_id}
+            `;
+            document.getElementById('processBtn').href = data.next_step;
+        } else {
+            throw new Error(data.error || 'Unknown error occurred');
+        }
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        document.getElementById('progressSection').style.display = 'none';
+        document.getElementById('errorSection').style.display = 'block';
+        document.getElementById('errorText').textContent = error.message;
+    })
+    .finally(() => {
+        // Re-enable form
+        document.getElementById('scrapeBtn').disabled = false;
+        document.getElementById('scrapeBtn').innerHTML = '<i class="fas fa-download me-2"></i>Start Scraping';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+flask
+openai>=1.10.0
+faiss-cpu
+apify-client
+requests
+python-dotenv
+numpy
+pandas
+pydub
+beautifulsoup4
+tiktoken
+sentence-transformers
