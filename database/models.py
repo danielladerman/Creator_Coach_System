@@ -317,12 +317,25 @@ class DatabaseManager:
         ''', (creator_id,))
 
         result = cursor.fetchone()
+
+        # Get knowledge base statistics
+        cursor.execute('''
+            SELECT
+                COUNT(DISTINCT post_id) as knowledge_transcriptions,
+                COUNT(*) as knowledge_chunks
+            FROM knowledge_chunks
+            WHERE creator_id = ?
+        ''', (creator_id,))
+
+        knowledge_result = cursor.fetchone()
         # Don't close connection - reuse it
 
         return {
             "total_posts": result[0] if result else 0,
             "transcribed_posts": result[1] if result else 0,
-            "video_posts": result[2] if result else 0
+            "video_posts": result[2] if result else 0,
+            "knowledge_transcriptions": knowledge_result[0] if knowledge_result else 0,
+            "knowledge_chunks": knowledge_result[1] if knowledge_result else 0
         }
 
     def delete_post(self, post_id: str) -> bool:

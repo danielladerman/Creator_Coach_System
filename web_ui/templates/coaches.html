@@ -32,6 +32,12 @@
                     <span class="badge bg-secondary me-1">{{ coach.platform }}</span>
                 </div>
 
+                <h6>Knowledge Base:</h6>
+                <div class="mb-3">
+                    <span class="badge bg-warning me-1">{{ coach.knowledge_transcriptions }} transcriptions</span>
+                    <span class="badge bg-primary me-1">{{ coach.knowledge_chunks }} chunks</span>
+                </div>
+
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-muted">
                         {% if coach.analysis_date %}

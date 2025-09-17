@@ -52,9 +52,17 @@
                         <h5><i class="fas fa-check-circle me-2"></i>Scraping Complete!</h5>
                         <div id="resultsText"></div>
                         <hr>
+                        <div class="alert alert-info mb-3">
+                            <h6><i class="fas fa-info-circle me-2"></i>Next Steps:</h6>
+                            <ol class="mb-2">
+                                <li><strong>Go to Posts Management</strong> - View all scraped content</li>
+                                <li><strong>Transcribe Videos</strong> - Click individual videos to transcribe them</li>
+                                <li><strong>Process Content</strong> - Create coach after transcription is complete</li>
+                            </ol>
+                        </div>
                         <div class="d-grid">
-                            <a href="#" id="processBtn" class="btn btn-success">
-                                <i class="fas fa-cogs me-2"></i>Process Content & Create Coach
+                            <a href="/posts" class="btn btn-primary">
+                                <i class="fas fa-arrow-right me-2"></i>Continue to Posts Management
                             </a>
                         </div>
                     </div>
@@ -184,7 +192,6 @@ document.getElementById('scrapeForm').addEventListener('submit', function(e) {
                 💾 Posts saved: ${data.posts_saved}<br>
                 🆔 Creator ID: ${data.creator_id}
             `;
-            document.getElementById('processBtn').href = data.next_step;
         } else {
             throw new Error(data.error || 'Unknown error occurred');
         }

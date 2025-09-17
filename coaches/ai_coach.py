@@ -304,6 +304,8 @@ class CoachManager:
                     "display_name": creator.get('display_name', creator['username']),
                     "total_posts": stats['total_posts'],
                     "transcribed_posts": stats['transcribed_posts'],
+                    "knowledge_transcriptions": stats['knowledge_transcriptions'],
+                    "knowledge_chunks": stats['knowledge_chunks'],
                     "platform": creator.get('platform', 'instagram'),
                     "last_updated": coach_profile.get('updated_at')
                 })

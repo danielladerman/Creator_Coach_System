@@ -10,26 +10,24 @@
 
         <div class="card">
             <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h6><i class="fas fa-info-circle me-2"></i>Prerequisites:</h6>
+                    <p class="mb-0">Make sure you have transcribed videos manually from the <a href="/posts" class="alert-link">Posts Management</a> page before processing content.</p>
+                </div>
+
                 <h5>Processing Steps</h5>
                 <div class="row">
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <i class="fas fa-microphone fa-2x text-primary mb-2"></i>
-                            <h6>1. Transcribe Videos</h6>
-                            <p class="small text-muted">Convert video content to text</p>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="text-center mb-3">
                             <i class="fas fa-brain fa-2x text-success mb-2"></i>
-                            <h6>2. Analyze Content</h6>
-                            <p class="small text-muted">Extract expertise and frameworks</p>
+                            <h6>1. Analyze Content</h6>
+                            <p class="small text-muted">Extract expertise and frameworks from transcribed videos</p>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="text-center mb-3">
                             <i class="fas fa-robot fa-2x text-info mb-2"></i>
-                            <h6>3. Create Coach</h6>
+                            <h6>2. Create Coach</h6>
                             <p class="small text-muted">Generate AI coach with knowledge base</p>
                         </div>
                     </div>
@@ -79,6 +77,9 @@
         </div>
 
         <div class="text-center mt-3">
+            <a href="/posts" class="btn btn-outline-primary me-2">
+                <i class="fas fa-video me-1"></i>Posts Management
+            </a>
             <a href="{{ url_for('scrape_page') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i>Back to Scraping
             </a>
@@ -109,9 +110,9 @@ document.getElementById('startProcessBtn').addEventListener('click', function() 
         progressBar.style.width = progress + '%';
 
         const statuses = [
-            'Transcribing video content...',
-            'Analyzing expertise areas...',
-            'Extracting frameworks...',
+            'Analyzing transcribed content...',
+            'Extracting expertise areas...',
+            'Identifying frameworks...',
             'Building knowledge base...',
             'Creating AI coach...',
             'Finalizing coach profile...'
@@ -139,7 +140,6 @@ document.getElementById('startProcessBtn').addEventListener('click', function() 
             document.getElementById('resultsText').innerHTML = `
                 <strong>Content Analysis:</strong><br>
                 📊 Posts processed: ${results.total_posts}<br>
-                🎥 Videos transcribed: ${results.transcription_results?.successful || 0}<br>
                 🧠 Expertise areas found: ${results.analysis_results?.transcribed_posts || 0}<br>
                 ⚡ Frameworks extracted: ${results.analysis_results?.frameworks || 0}<br>
                 📚 Knowledge chunks: ${results.coach_creation_results?.knowledge_chunks || 0}

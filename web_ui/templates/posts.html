@@ -240,7 +240,7 @@ function displayPosts(posts) {
                     </button>` : ''
                 }
                 ${post.post_type === 'video' && !post.transcript ?
-                    `<button class="btn btn-sm btn-outline-success ms-1" onclick="transcribePost(${allPosts.indexOf(post)})" title="Transcribe Video">
+                    `<button class="btn btn-sm btn-outline-success ms-1" id="transcribeBtn-${allPosts.indexOf(post)}" onclick="transcribePost(${allPosts.indexOf(post)})" title="Transcribe Video">
                         <i class="fas fa-microphone"></i>
                     </button>` : ''
                 }
@@ -366,11 +366,19 @@ function transcribePost(index = null) {
         return;
     }
 
-    // Show loading state
-    const btn = document.getElementById('transcribePostBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Transcribing...';
+    // Show loading state for both modal and table buttons
+    const modalBtn = document.getElementById('transcribePostBtn');
+    const tableBtn = index !== null ? document.getElementById(`transcribeBtn-${index}`) : null;
+
+    if (modalBtn) {
+        modalBtn.disabled = true;
+        modalBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Transcribing...';
+    }
+
+    if (tableBtn) {
+        tableBtn.disabled = true;
+        tableBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        tableBtn.title = 'Transcribing...';
     }
 
     // Make API call to transcribe single post
@@ -383,33 +391,57 @@ function transcribePost(index = null) {
             post_ids: [post.post_id]
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => Promise.reject(new Error(err.error || `HTTP ${response.status}`)));
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             alert(`✅ Transcribed ${data.transcribed} video(s) successfully!`);
             // Reload posts to show updated transcription status
             loadPosts();
 
-            // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('postModal')).hide();
+            // Close modal only if we're transcribing from the modal (currentPost exists)
+            if (index === null && currentPost) {
+                const modal = document.getElementById('postModal');
+                if (modal) {
+                    const modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+            }
         } else {
             alert(`❌ Transcription failed: ${data.error}`);
         }
     })
     .catch(error => {
         console.error('Transcription error:', error);
-        alert('❌ Transcription failed: Network error');
+        // Check if it's a response error or network error
+        if (error.message && error.message !== 'Failed to fetch') {
+            alert(`❌ Transcription failed: ${error.message}`);
+        } else {
+            alert('❌ Transcription failed: Network connection error');
+        }
     })
     .finally(() => {
-        // Reset button state
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-microphone me-1"></i>Transcribe This Post';
+        // Reset button states
+        if (modalBtn) {
+            modalBtn.disabled = false;
+            modalBtn.innerHTML = '<i class="fas fa-microphone me-1"></i>Transcribe This Post';
+        }
+
+        if (tableBtn) {
+            tableBtn.disabled = false;
+            tableBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            tableBtn.title = 'Transcribe Video';
         }
     });
 }
 
-function transcribeVideos() {
+async function transcribeVideos() {
     if (!currentCreatorId) return;
 
     const videoPosts = allPosts.filter(p => p.post_type === 'video' && !p.transcript);
@@ -419,42 +451,87 @@ function transcribeVideos() {
     }
 
     if (confirm(`Transcribe ${videoPosts.length} videos? This may take several minutes.`)) {
-        // Show loading state
         const btn = document.getElementById('transcribeBtn');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Transcribing...';
-        }
+        let transcribed = 0;
+        let failed = 0;
 
-        // Make API call to transcribe all videos
-        fetch(`/api/transcribe/${currentCreatorId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({}) // Empty body = transcribe all videos
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`✅ Transcribed ${data.transcribed} videos successfully!\n${data.failed > 0 ? `⚠️ ${data.failed} videos failed` : ''}`);
-                // Reload posts to show updated transcription status
-                loadPosts();
-            } else {
-                alert(`❌ Transcription failed: ${data.error}`);
+        try {
+            // Show initial progress
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>Transcribing 0/${videoPosts.length}...`;
             }
-        })
-        .catch(error => {
-            console.error('Transcription error:', error);
-            alert('❌ Transcription failed: Network error');
-        })
-        .finally(() => {
+
+            // Process videos one by one for real-time progress
+            for (let i = 0; i < videoPosts.length; i++) {
+                const post = videoPosts[i];
+
+                // Update progress
+                if (btn) {
+                    btn.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>Transcribing ${i + 1}/${videoPosts.length}...`;
+                }
+
+                try {
+                    const response = await fetch(`/api/transcribe/${currentCreatorId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            post_ids: [post.post_id]
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (data.success && data.transcribed > 0) {
+                        transcribed++;
+
+                        // Update the post in our local array
+                        const postIndex = allPosts.findIndex(p => p.post_id === post.post_id);
+                        if (postIndex !== -1) {
+                            allPosts[postIndex].transcript = 'Transcribed'; // Placeholder
+                        }
+
+                        // Update display every few transcriptions or at the end
+                        if (transcribed % 3 === 0 || i === videoPosts.length - 1) {
+                            displayPosts(allPosts);
+                            updateStats(allPosts);
+                        }
+                    } else {
+                        failed++;
+                    }
+                } catch (error) {
+                    console.error(`Error transcribing post ${post.post_id}:`, error);
+                    failed++;
+                }
+
+                // Small delay to prevent overwhelming the API
+                if (i < videoPosts.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+
+            // Show final results
+            alert(`✅ Transcription complete!\n📹 Transcribed: ${transcribed}\n${failed > 0 ? `⚠️ Failed: ${failed}` : ''}`);
+
+            // Final reload to ensure everything is up to date
+            loadPosts();
+
+        } catch (error) {
+            console.error('Bulk transcription error:', error);
+            alert(`❌ Transcription failed: ${error.message || 'Unknown error'}`);
+        } finally {
             // Reset button state
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-microphone me-1"></i>Transcribe All Videos';
             }
-        });
+        }
     }
 }
 
