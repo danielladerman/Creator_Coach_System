@@ -10,8 +10,56 @@
     </div>
 </div>
 
+<div class="row mb-5 mt-4">
+    <div class="col-12">
+        <h3><i class="fas fa-info-circle me-2"></i>How It Works</h3>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="text-center">
+                    <i class="fas fa-plus fa-3x text-primary mb-3"></i>
+                    <h5>1. Create Coach</h5>
+                    <p>Add a creator and extract their posts, videos, and engagement data</p>
+                    <a href="{{ url_for('scrape_page') }}" class="btn btn-primary btn-sm mt-2">
+                        <i class="fas fa-plus me-1"></i>Add Creator
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <i class="fas fa-microphone fa-3x text-success mb-3"></i>
+                    <h5>2. Transcribe Videos</h5>
+                    <p>Convert video content to text using AI transcription</p>
+                    <a href="/posts" class="btn btn-success btn-sm mt-2">
+                        <i class="fas fa-microphone me-1"></i>Manage Posts
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <i class="fas fa-brain fa-3x text-warning mb-3"></i>
+                    <h5>3. Create Brain</h5>
+                    <p>Build intelligent knowledge base from transcribed content and expertise</p>
+                    <a href="/posts" class="btn btn-warning btn-sm mt-2">
+                        <i class="fas fa-brain me-1"></i>Manage Posts
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <i class="fas fa-comments fa-3x text-info mb-3"></i>
+                    <h5>4. Talk with Coach</h5>
+                    <p>Chat with AI coach for personalized advice and insights</p>
+                    <a href="{{ url_for('coaches_list') }}" class="btn btn-info btn-sm mt-2">
+                        <i class="fas fa-comments me-1"></i>View Coaches
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row mb-4">
-    <div class="col-md-4">
+    <div class="col-md-12">
         <div class="card text-white bg-primary">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
@@ -21,38 +69,6 @@
                     </div>
                     <div class="align-self-center">
                         <i class="fas fa-users fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Active Coaches</h5>
-                        <h2>{{ data.available_coaches or 0 }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-robot fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-info">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Get Started</h5>
-                        <a href="{{ url_for('scrape_page') }}" class="btn btn-light">
-                            <i class="fas fa-plus me-1"></i>Add Creator
-                        </a>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-download fa-2x"></i>
                     </div>
                 </div>
             </div>
@@ -89,6 +105,12 @@
                     <span class="badge bg-secondary me-1">{{ coach.platform }}</span>
                 </div>
 
+                <h6>Knowledge Base:</h6>
+                <div class="mb-3">
+                    <span class="badge bg-warning me-1">{{ coach.knowledge_transcriptions }} transcriptions</span>
+                    <span class="badge bg-primary me-1">{{ coach.knowledge_chunks }} chunks</span>
+                </div>
+
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-muted">
                         {% if coach.analysis_date %}
@@ -122,39 +144,4 @@
 </div>
 {% endif %}
 
-<div class="row mt-5">
-    <div class="col-12">
-        <h3><i class="fas fa-info-circle me-2"></i>How It Works</h3>
-        <div class="row">
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="fas fa-download fa-3x text-primary mb-3"></i>
-                    <h5>1. Scrape Content</h5>
-                    <p>Extract posts, videos, and engagement data from Instagram creators</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="fas fa-microphone fa-3x text-success mb-3"></i>
-                    <h5>2. Transcribe Videos</h5>
-                    <p>Convert video content to text using AI transcription</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="fas fa-brain fa-3x text-warning mb-3"></i>
-                    <h5>3. Analyze Expertise</h5>
-                    <p>Extract real frameworks, strategies, and teaching style</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="fas fa-robot fa-3x text-info mb-3"></i>
-                    <h5>4. Create Coach</h5>
-                    <p>Generate AI coach that gives authentic advice based on real content</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
