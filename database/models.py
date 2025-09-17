@@ -318,25 +318,48 @@ class DatabaseManager:
 
         result = cursor.fetchone()
 
-        # Get knowledge base statistics
-        cursor.execute('''
-            SELECT
-                COUNT(DISTINCT post_id) as knowledge_transcriptions,
-                COUNT(*) as knowledge_chunks
-            FROM knowledge_chunks
-            WHERE creator_id = ?
-        ''', (creator_id,))
-
-        knowledge_result = cursor.fetchone()
+        # Get knowledge base statistics from JSON metadata files (source of truth)
+        knowledge_stats = self._get_knowledge_stats_from_files(creator_id)
         # Don't close connection - reuse it
 
         return {
             "total_posts": result[0] if result else 0,
             "transcribed_posts": result[1] if result else 0,
             "video_posts": result[2] if result else 0,
-            "knowledge_transcriptions": knowledge_result[0] if knowledge_result else 0,
-            "knowledge_chunks": knowledge_result[1] if knowledge_result else 0
+            "knowledge_transcriptions": knowledge_stats['transcriptions'],
+            "knowledge_chunks": knowledge_stats['chunks']
         }
+
+    def _get_knowledge_stats_from_files(self, creator_id: int) -> Dict:
+        """Get knowledge base statistics from JSON metadata files"""
+        import json
+        import os
+
+        kb_dir = f'knowledge_base/creator_{creator_id}'
+        metadata_file = os.path.join(kb_dir, 'chunk_metadata.json')
+
+        if not os.path.exists(metadata_file):
+            return {'transcriptions': 0, 'chunks': 0}
+
+        try:
+            with open(metadata_file, 'r') as f:
+                chunks = json.load(f)
+
+            # Count unique post IDs and total chunks
+            unique_posts = set()
+            total_chunks = len(chunks)
+
+            for chunk in chunks:
+                post_id = chunk.get('post_metadata', {}).get('post_id')
+                if post_id:
+                    unique_posts.add(post_id)
+
+            return {
+                'transcriptions': len(unique_posts),
+                'chunks': total_chunks
+            }
+        except (json.JSONDecodeError, FileNotFoundError, KeyError):
+            return {'transcriptions': 0, 'chunks': 0}
 
     def delete_post(self, post_id: str) -> bool:
         """Delete a post by post_id"""
