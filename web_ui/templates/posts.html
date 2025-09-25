@@ -61,6 +61,9 @@
                     <button class="btn btn-outline-success" onclick="updateCoach()" id="updateCoachBtn" disabled>
                         <i class="fas fa-sync me-1"></i>Update Coach Knowledge
                     </button>
+                    <button class="btn btn-outline-danger" onclick="bulkDeleteSelected()" id="bulkDeleteBtn" disabled>
+                        <i class="fas fa-trash-alt me-1"></i>Delete Selected Posts
+                    </button>
                 </div>
             </div>
         </div>
@@ -109,6 +112,9 @@
                     <table class="table table-hover" id="postsTable">
                         <thead>
                             <tr>
+                                <th>
+                                    <input type="checkbox" id="selectAll" title="Select All">
+                                </th>
                                 <th>Post</th>
                                 <th>Type</th>
                                 <th>Date</th>
@@ -216,6 +222,9 @@ function displayPosts(posts) {
 
         row.innerHTML = `
             <td>
+                <input type="checkbox" class="post-checkbox" value="${post.post_id}" onclick="updateBulkDeleteButton()">
+            </td>
+            <td>
                 <div class="d-flex align-items-center">
                     <div class="me-2 post-icon" style="width: 40px; height: 40px; background: ${post.post_type === 'video' ? '#007bff' : '#6c757d'}; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-${post.post_type === 'video' ? 'video' : 'image'} text-white" style="font-size: 14px;"></i>
@@ -239,11 +248,14 @@ function displayPosts(posts) {
                         <i class="fab fa-instagram me-1"></i>Instagram
                     </button>` : ''
                 }
-                ${post.post_type === 'video' && !post.transcript ?
+                ${post.needs_transcription ?
                     `<button class="btn btn-sm btn-outline-success ms-1" id="transcribeBtn-${allPosts.indexOf(post)}" onclick="transcribePost(${allPosts.indexOf(post)})" title="Transcribe Video">
                         <i class="fas fa-microphone"></i>
                     </button>` : ''
                 }
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="deletePost('${post.post_id}', ${allPosts.indexOf(post)})" title="Delete Post">
+                    <i class="fas fa-trash"></i>
+                </button>
             </td>
         `;
 
@@ -272,8 +284,8 @@ function filterPosts() {
         if (typeFilter && post.post_type !== typeFilter) return false;
 
         // Transcription filter
-        if (transcriptionFilter === 'transcribed' && !post.transcript) return false;
-        if (transcriptionFilter === 'pending' && (post.post_type !== 'video' || post.transcript)) return false;
+        if (transcriptionFilter === 'transcribed' && !post.has_transcript) return false;
+        if (transcriptionFilter === 'pending' && !post.needs_transcription) return false;
         if (transcriptionFilter === 'no-video' && post.post_type === 'video') return false;
 
         // Search filter
@@ -343,7 +355,7 @@ function viewPost(index) {
 
     // Show/hide transcribe button
     const transcribeBtn = document.getElementById('transcribePostBtn');
-    if (post.post_type === 'video' && !post.transcript) {
+    if (post.needs_transcription) {
         transcribeBtn.style.display = 'inline-block';
     } else {
         transcribeBtn.style.display = 'none';
@@ -354,6 +366,7 @@ function viewPost(index) {
 
 function transcribePost(index = null) {
     const post = index !== null ? allPosts[index] : currentPost;
+    console.log('🎯 transcribePost called with:', {index, post, currentCreatorId});
     if (!post) return;
 
     if (post.post_type !== 'video') {
@@ -361,7 +374,7 @@ function transcribePost(index = null) {
         return;
     }
 
-    if (post.transcript) {
+    if (post.has_transcript) {
         alert('This post is already transcribed');
         return;
     }
@@ -382,6 +395,7 @@ function transcribePost(index = null) {
     }
 
     // Make API call to transcribe single post
+    console.log('🚀 Making transcribe API call for post:', post.post_id);
     fetch(`/api/transcribe/${currentCreatorId}`, {
         method: 'POST',
         headers: {
@@ -444,7 +458,7 @@ function transcribePost(index = null) {
 async function transcribeVideos() {
     if (!currentCreatorId) return;
 
-    const videoPosts = allPosts.filter(p => p.post_type === 'video' && !p.transcript);
+    const videoPosts = allPosts.filter(p => p.needs_transcription);
     if (videoPosts.length === 0) {
         alert('No videos need transcription');
         return;
@@ -624,6 +638,115 @@ function viewPostOnInstagram(postId) {
         // Fallback to profile if conversion fails
         viewOnInstagram();
     }
+}
+
+function deletePost(postId, postIndex) {
+    if (!confirm(`Are you sure you want to delete this post? This action cannot be undone.`)) {
+        return;
+    }
+
+    fetch(`/api/posts/${postId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ ${data.message}`);
+            // Reload posts to refresh the view
+            loadPosts();
+        } else {
+            alert(`❌ Error: ${data.message || data.error}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting post:', error);
+        alert(`❌ Error deleting post: ${error.message}`);
+    });
+}
+
+function toggleAllCheckboxes() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const postCheckboxes = document.querySelectorAll('.post-checkbox');
+
+    postCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+
+    updateBulkDeleteButton();
+}
+
+function updateBulkDeleteButton() {
+    const selectedCheckboxes = document.querySelectorAll('.post-checkbox:checked');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+
+    if (bulkDeleteBtn) {
+        if (selectedCheckboxes.length > 0) {
+            bulkDeleteBtn.disabled = false;
+            bulkDeleteBtn.textContent = `Delete Selected Posts (${selectedCheckboxes.length})`;
+        } else {
+            bulkDeleteBtn.disabled = true;
+            bulkDeleteBtn.textContent = 'Delete Selected Posts';
+        }
+    }
+}
+
+function bulkDeleteSelected() {
+    const selectedCheckboxes = document.querySelectorAll('.post-checkbox:checked');
+
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select posts to delete');
+        return;
+    }
+
+    const postIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+
+    if (!confirm(`Are you sure you want to delete ${postIds.length} selected post(s)? This action cannot be undone.`)) {
+        return;
+    }
+
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    if (bulkDeleteBtn) {
+        bulkDeleteBtn.disabled = true;
+        bulkDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+    }
+
+    fetch('/api/posts/bulk-delete', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            post_ids: postIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ ${data.message}`);
+            // Uncheck select all checkbox
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
+            // Reload posts to refresh the view
+            loadPosts();
+        } else {
+            alert(`❌ Error: ${data.message || data.error}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting posts:', error);
+        alert(`❌ Error deleting posts: ${error.message}`);
+    })
+    .finally(() => {
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = true;
+            bulkDeleteBtn.textContent = 'Delete Selected Posts';
+        }
+    });
 }
 
 // Load posts if creator is pre-selected

@@ -381,6 +381,66 @@ def update_coach_knowledge(creator_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/posts/<post_id>/delete', methods=['DELETE'])
+def delete_post(post_id):
+    """API endpoint to delete a specific post"""
+    try:
+        success = db.delete_post(post_id)
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Post {post_id} deleted successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": f"Post {post_id} not found or could not be deleted"
+            }), 404
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/posts/bulk-delete', methods=['DELETE'])
+def bulk_delete_posts():
+    """API endpoint to delete multiple posts"""
+    try:
+        data = request.get_json()
+        post_ids = data.get('post_ids', [])
+
+        if not post_ids:
+            return jsonify({
+                "success": False,
+                "message": "No post IDs provided"
+            }), 400
+
+        deleted_count = 0
+        failed_posts = []
+
+        for post_id in post_ids:
+            success = db.delete_post(post_id)
+            if success:
+                deleted_count += 1
+            else:
+                failed_posts.append(post_id)
+
+        return jsonify({
+            "success": True,
+            "deleted_count": deleted_count,
+            "total_requested": len(post_ids),
+            "failed_posts": failed_posts,
+            "message": f"Successfully deleted {deleted_count} out of {len(post_ids)} posts"
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.errorhandler(404)
 def not_found(error):
     return render_template('404.html'), 404
